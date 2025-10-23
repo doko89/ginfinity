@@ -14,17 +14,19 @@ import (
 	"gin-boilerplate/internal/domain/service"
 	"gin-boilerplate/internal/infrastructure/config"
 	"gin-boilerplate/internal/infrastructure/persistence/postgres"
+	"gin-boilerplate/internal/infrastructure/storage"
 	"gin-boilerplate/internal/interfaces/http/handler"
 	httpmiddleware "gin-boilerplate/internal/interfaces/http/middleware"
 	"gin-boilerplate/internal/interfaces/http/router"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	_ "gin-boilerplate/docs" // swagger docs
 )
 
 // @title Gin Boilerplate API
 // @version 1.0
-// @description A REST API boilerplate using Gin Framework with DDD architecture, authentication, and multi-role authorization.
+// @description A REST API boilerplate using Gin Framework with DDD architecture, authentication, multi-role authorization, S3-compatible file storage, and document management.
 // @termsOfService http://swagger.io/terms/
 
 // @contact.name API Support
@@ -90,9 +92,23 @@ func main() {
 		cfg.Google.RedirectURL,
 	)
 
+	// Setup S3 client
+	s3Client, err := storage.NewS3Client(storage.S3Config{
+		Endpoint:        cfg.S3.Endpoint,
+		AccessKeyID:     cfg.S3.AccessKeyID,
+		SecretAccessKey: cfg.S3.SecretAccessKey,
+		Region:          cfg.S3.Region,
+		Bucket:          cfg.S3.Bucket,
+		UseSSL:          cfg.S3.UseSSL,
+	})
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize S3 client")
+	}
+
 	// Setup repositories
 	userRepo := postgres.NewUserRepository(db.GetDB())
 	tokenRepo := postgres.NewTokenRepository(db.GetDB())
+	documentRepo := postgres.NewDocumentRepository(db.GetDB())
 
 	// Setup use cases
 	registerUseCase := usecase.NewRegisterUseCase(userRepo, passwordService, tokenService)
@@ -108,6 +124,9 @@ func main() {
 	deleteUserUseCase := usecase.NewDeleteUserUseCase(userRepo)
 	promoteUserUseCase := usecase.NewPromoteUserUseCase(userRepo)
 	demoteUserUseCase := usecase.NewDemoteUserUseCase(userRepo)
+
+	// Document management use cases
+	documentUseCase := usecase.NewDocumentUseCase(documentRepo, s3Client)
 
 	// Setup handlers
 	authHandler := handler.NewAuthHandler(
@@ -128,6 +147,8 @@ func main() {
 		demoteUserUseCase,
 	)
 
+	documentHandler := handler.NewDocumentHandler(documentUseCase)
+
 	// Setup middleware
 	authMiddleware := httpmiddleware.NewAuthMiddleware(tokenService)
 	roleMiddleware := httpmiddleware.NewRoleMiddleware()
@@ -141,6 +162,7 @@ func main() {
 	router := router.NewRouter(
 		authHandler,
 		userHandler,
+		documentHandler,
 		authMiddleware,
 		roleMiddleware,
 		loggerMiddleware,

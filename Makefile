@@ -88,6 +88,8 @@ docs: ## Generate Swagger documentation
 		exit 1; \
 	fi
 
+swagger: docs ## Alias for docs command
+
 # Docker targets
 docker-build: ## Build Docker image
 	docker build -t $(APP_NAME):latest .

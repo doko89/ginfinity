@@ -1,6 +1,6 @@
 # Gin Boilerplate with DDD Architecture
 
-A production-ready REST API boilerplate using Gin Framework with Domain-Driven Design (DDD) architecture, authentication system, and multi-role authorization.
+A production-ready REST API boilerplate using Gin Framework with Domain-Driven Design (DDD) architecture, authentication system, multi-role authorization, S3-compatible file storage, and document management.
 
 ## 🚀 Features
 
@@ -8,12 +8,14 @@ A production-ready REST API boilerplate using Gin Framework with Domain-Driven D
 - **Authentication**: Email/password and Google OAuth 2.0
 - **Authorization**: Role-based access control (User & Admin roles)
 - **JWT Tokens**: Access and refresh token implementation
-- **Database**: PostgreSQL with GORM ORM
-- **Security**: Password hashing with bcrypt, CORS, request validation
+- **Database**: PostgreSQL with GORM ORM and auto-migration
+- **File Storage**: S3-compatible storage (AWS S3, MinIO, DigitalOcean Spaces, etc.)
+- **Document Management**: Complete CRUD operations with file upload/download
+- **Security**: Password hashing with bcrypt, CORS, request validation, file type/size restrictions
 - **Logging**: Structured logging with logrus
 - **Middleware**: Authentication, role-based authorization, CORS, logging
 - **Configuration**: Environment-based configuration with godotenv
-- **API Documentation**: Swagger documentation ready
+- **API Documentation**: Complete Swagger/OpenAPI documentation
 - **Docker Ready**: Dockerfile included
 - **Testing**: Test structure with unit and integration tests
 
@@ -28,37 +30,46 @@ gin-boilerplate/
 │   ├── domain/                     # Business Logic Layer
 │   │   ├── entity/                 # Domain entities
 │   │   │   ├── user.go
-│   │   │   └── token.go
+│   │   │   ├── token.go
+│   │   │   └── document.go
 │   │   ├── repository/             # Repository interfaces
 │   │   │   ├── user_repository.go
-│   │   │   └── token_repository.go
+│   │   │   ├── token_repository.go
+│   │   │   └── document_repository.go
+│   │   ├── errors.go               # Domain errors
 │   │   └── service/                # Domain services
 │   │       ├── password_service.go
 │   │       └── token_service.go
 │   ├── application/                # Application Layer
 │   │   ├── dto/                    # Data Transfer Objects
-│   │   │   └── auth_dto.go
+│   │   │   ├── auth_dto.go
+│   │   │   └── document_dto.go
 │   │   └── usecase/                # Use cases
 │   │       ├── register_usecase.go
 │   │       ├── login_usecase.go
 │   │       ├── google_auth_usecase.go
 │   │       ├── refresh_token_usecase.go
 │   │       ├── logout_usecase.go
-│   │       └── user_usecase.go
+│   │       ├── user_usecase.go
+│   │       └── document_usecase.go
 │   ├── infrastructure/             # Infrastructure Layer
 │   │   ├── config/                 # Configuration
 │   │   │   ├── config.go
 │   │   │   └── google_oauth.go
-│   │   └── persistence/
-│   │       └── postgres/
-│   │           ├── database.go
-│   │           ├── user_repository.go
-│   │           └── token_repository.go
+│   │   ├── persistence/
+│   │   │   └── postgres/
+│   │   │       ├── database.go
+│   │   │       ├── user_repository.go
+│   │   │       ├── token_repository.go
+│   │   │       └── document_repository.go
+│   │   └── storage/
+│   │       └── s3_client.go       # S3-compatible storage client
 │   └── interfaces/                 # Presentation Layer
 │       └── http/
 │           ├── handler/            # HTTP handlers
 │           │   ├── auth_handler.go
-│           │   └── user_handler.go
+│           │   ├── user_handler.go
+│           │   └── document_handler.go
 │           ├── middleware/         # Middlewares
 │           │   ├── auth_middleware.go
 │           │   ├── role_middleware.go
@@ -66,6 +77,7 @@ gin-boilerplate/
 │           │   └── logger_middleware.go
 │           └── router/             # Route definitions
 │               └── router.go
+├── interfaces/dto/                 # Request/Response DTOs
 ├── pkg/                            # Public utilities
 ├── docs/                           # API documentation (generated)
 ├── .env.example                    # Environment variables template
@@ -80,9 +92,11 @@ gin-boilerplate/
 
 - **Go 1.21+**
 - **Gin Framework** - HTTP web framework
-- **GORM** - PostgreSQL ORM
+- **GORM** - PostgreSQL ORM with auto-migration
+- **AWS SDK v2** - S3-compatible storage integration
 - **JWT** - JSON Web Tokens for authentication
 - **Google OAuth 2.0** - Third-party authentication
+- **Swagger/OpenAPI** - API documentation generation
 - **bcrypt** - Password hashing
 - **logrus** - Structured logging
 - **gin-contrib/cors** - CORS middleware
@@ -156,6 +170,17 @@ The API will be available at `http://localhost:8080`
 | POST | `/api/v1/users/:id/promote` | Promote user to admin | Yes | Admin |
 | POST | `/api/v1/users/:id/demote` | Demote admin to user | Yes | Admin |
 
+### Document Endpoints
+
+| Method | Endpoint | Description | Auth Required | Role Required |
+|--------|----------|-------------|---------------|---------------|
+| POST | `/api/v1/documents/upload` | Upload document with file | Yes | User/Admin |
+| GET | `/api/v1/documents` | List user documents (paginated) | Yes | User/Admin |
+| GET | `/api/v1/documents/:id` | Get document by ID | Yes | User/Admin |
+| PUT | `/api/v1/documents/:id` | Update document metadata | Yes | User/Admin |
+| DELETE | `/api/v1/documents/:id` | Delete document and file | Yes | User/Admin |
+| GET | `/api/v1/documents/:id/download` | Get presigned download URL | Yes | User/Admin |
+
 ### API Examples
 
 #### Register User
@@ -185,6 +210,24 @@ curl -X GET http://localhost:8080/api/v1/users/me \
   -H "Authorization: Bearer <access-token>"
 ```
 
+#### Upload Document
+```bash
+curl -X POST http://localhost:8080/api/v1/documents/upload \
+  -H "Authorization: Bearer <access-token>" \
+  -F "title=My Document" \
+  -F "description=A sample document" \
+  -F "file=@/path/to/document.pdf"
+```
+
+#### Get Presigned Download URL
+```bash
+curl -X GET http://localhost:8080/api/v1/documents/:id/download \
+  -H "Authorization: Bearer <access-token>"
+```
+
+#### Access API Documentation
+Visit `http://localhost:8080/swagger/index.html` for interactive API documentation.
+
 ## ⚙️ Configuration
 
 ### Environment Variables
@@ -210,6 +253,14 @@ GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_REDIRECT_URL=http://localhost:8080/api/v1/auth/google/callback
 
+# S3-Compatible Storage Configuration
+S3_ENDPOINT=https://s3.amazonaws.com  # For AWS S3. For MinIO: http://localhost:9000
+S3_ACCESS_KEY_ID=your-s3-access-key
+S3_SECRET_ACCESS_KEY=your-s3-secret-key
+S3_REGION=us-east-1
+S3_BUCKET=your-bucket-name
+S3_USE_SSL=true
+
 # Server Configuration
 SERVER_PORT=8080
 SERVER_ENV=development
@@ -223,6 +274,30 @@ SERVER_ENV=development
 4. Create OAuth 2.0 client ID
 5. Add authorized redirect URI: `http://localhost:8080/api/v1/auth/google/callback`
 6. Copy Client ID and Client Secret to your `.env` file
+
+### S3-Compatible Storage Setup
+
+#### AWS S3
+1. Create an AWS account and S3 bucket
+2. Create IAM user with programmatic access
+3. Attach policy with S3 permissions (GetObject, PutObject, DeleteObject)
+4. Copy credentials to your `.env` file
+
+#### MinIO (Local Development)
+1. Install MinIO: `docker run -p 9000:9000 -p 9001:9001 minio/minio server /data`
+2. Create bucket through MinIO console
+3. Configure with endpoint: `http://localhost:9000`
+
+#### DigitalOcean Spaces
+1. Create a Space in your DigitalOcean account
+2. Generate API keys
+3. Configure with your Space endpoint and credentials
+
+#### File Upload Restrictions
+- **Maximum file size**: 10MB
+- **Allowed file types**: Images (JPEG, PNG, GIF), PDF, Text, Word documents
+- **User isolation**: Users can only access their own documents
+- **Automatic cleanup**: Files are deleted from storage when documents are deleted
 
 ## 🧪 Development
 
@@ -240,6 +315,7 @@ make lint          # Run linter
 make fmt           # Format code
 make tidy          # Clean up dependencies
 make docs          # Generate Swagger docs
+make swagger       # Alias for docs command
 make docker-build  # Build Docker image
 make docker-run    # Run Docker container
 make setup         # Quick setup for development
@@ -322,6 +398,8 @@ volumes:
 - **Input Validation**: Request validation using struct tags
 - **CORS**: Configurable CORS middleware
 - **Role-Based Access Control**: Middleware for role verification
+- **File Security**: File type validation, size limits, and user isolation
+- **Storage Security**: Presigned URLs with expiration for secure file access
 - **SQL Injection Prevention**: GORM ORM provides protection
 - **HTTPS Ready**: Production deployment should use HTTPS
 
@@ -414,8 +492,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [Gin Framework Documentation](https://gin-gonic.com/docs/)
 - [GORM Documentation](https://gorm.io/docs/)
+- [AWS SDK v2 Documentation](https://pkg.go.dev/github.com/aws/aws-sdk-go-v2)
+- [Swagger/OpenAPI Documentation](https://swagger.io/specification/)
 - [JWT Documentation](https://jwt.io/)
 - [Google OAuth 2.0 Documentation](https://developers.google.com/identity/protocols/oauth2)
+- [S3-Compatible Storage](https://docs.aws.amazon.com/s3/)
 - [Domain-Driven Design](https://en.wikipedia.org/wiki/Domain-driven_design)
 
 ---

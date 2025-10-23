@@ -5,6 +5,8 @@ import (
 	"gin-boilerplate/internal/interfaces/http/middleware"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // Router wraps Gin router with all routes
@@ -16,6 +18,7 @@ type Router struct {
 func NewRouter(
 	authHandler *handler.AuthHandler,
 	userHandler *handler.UserHandler,
+	documentHandler *handler.DocumentHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	roleMiddleware *middleware.RoleMiddleware,
 	loggerMiddleware func() gin.HandlerFunc,
@@ -33,7 +36,7 @@ func NewRouter(
 		engine: engine,
 	}
 
-	router.setupRoutes(authHandler, userHandler, authMiddleware, roleMiddleware)
+	router.setupRoutes(authHandler, userHandler, documentHandler, authMiddleware, roleMiddleware)
 
 	return router
 }
@@ -42,9 +45,13 @@ func NewRouter(
 func (r *Router) setupRoutes(
 	authHandler *handler.AuthHandler,
 	userHandler *handler.UserHandler,
+	documentHandler *handler.DocumentHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	roleMiddleware *middleware.RoleMiddleware,
 ) {
+	// Swagger documentation
+	r.engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	// Health check endpoint
 	r.engine.GET("/health", r.healthCheck)
 
@@ -61,7 +68,7 @@ func (r *Router) setupRoutes(
 		protected := v1.Group("/")
 		protected.Use(authMiddleware.RequireAuth())
 		{
-			r.setupProtectedRoutes(protected, authHandler, userHandler, roleMiddleware)
+			r.setupProtectedRoutes(protected, authHandler, userHandler, documentHandler, roleMiddleware)
 		}
 
 		// Admin routes (admin role required)
@@ -92,6 +99,7 @@ func (r *Router) setupProtectedRoutes(
 	group *gin.RouterGroup,
 	authHandler *handler.AuthHandler,
 	userHandler *handler.UserHandler,
+	documentHandler *handler.DocumentHandler,
 	roleMiddleware *middleware.RoleMiddleware,
 ) {
 	// Authentication routes (require valid token)
@@ -107,6 +115,17 @@ func (r *Router) setupProtectedRoutes(
 		// Current user endpoints
 		users.GET("/me", userHandler.GetMe)
 		users.PUT("/me", userHandler.UpdateMe)
+	}
+
+	// Document routes (authenticated users)
+	documents := group.Group("/documents")
+	{
+		documents.POST("/upload", documentHandler.UploadDocument)
+		documents.GET("", documentHandler.GetUserDocuments)
+		documents.GET("/:id", documentHandler.GetDocument)
+		documents.PUT("/:id", documentHandler.UpdateDocument)
+		documents.DELETE("/:id", documentHandler.DeleteDocument)
+		documents.GET("/:id/download", documentHandler.GetPresignedURL)
 	}
 }
 

@@ -11,10 +11,11 @@ import (
 
 // Config represents application configuration
 type Config struct {
-	Server   ServerConfig
+	Server ServerConfig
 	Database DatabaseConfig
-	JWT      JWTConfig
-	Google   GoogleConfig
+	JWT JWTConfig
+	Google GoogleConfig
+	S3 S3Config
 }
 
 // ServerConfig represents server configuration
@@ -48,6 +49,16 @@ type GoogleConfig struct {
 	RedirectURL  string
 }
 
+// S3Config represents S3-compatible storage configuration
+type S3Config struct {
+	Endpoint        string
+	AccessKeyID     string
+	SecretAccessKey string
+	Region          string
+	Bucket          string
+	UseSSL          bool
+}
+
 // Load loads configuration from environment variables
 func Load() (*Config, error) {
 	// Load .env file if it exists
@@ -78,6 +89,14 @@ func Load() (*Config, error) {
 			ClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
 			ClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
 			RedirectURL:  getEnv("GOOGLE_REDIRECT_URL", ""),
+		},
+		S3: S3Config{
+			Endpoint:        getEnv("S3_ENDPOINT", ""),
+			AccessKeyID:     getEnv("S3_ACCESS_KEY_ID", ""),
+			SecretAccessKey: getEnv("S3_SECRET_ACCESS_KEY", ""),
+			Region:          getEnv("S3_REGION", "us-east-1"),
+			Bucket:          getEnv("S3_BUCKET", ""),
+			UseSSL:          getBoolEnv("S3_USE_SSL", true),
 		},
 	}
 
