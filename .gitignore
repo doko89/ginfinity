@@ -68,3 +68,5 @@ swagger.yaml
 # Build artifacts
 dist/
 build/
+api
+bin
