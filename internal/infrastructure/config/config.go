@@ -59,6 +59,15 @@ type S3Config struct {
 	UseSSL          bool
 }
 
+// RedisConfig represents Redis configuration
+type RedisConfig struct {
+	Host     string
+	Port     string
+	Password string
+	DB       int
+	PoolSize int
+}
+
 // Load loads configuration from environment variables
 func Load() (*Config, error) {
 	// Load .env file if it exists
@@ -97,6 +106,13 @@ func Load() (*Config, error) {
 			Region:          getEnv("S3_REGION", "us-east-1"),
 			Bucket:          getEnv("S3_BUCKET", ""),
 			UseSSL:          getBoolEnv("S3_USE_SSL", true),
+		},
+		Redis: RedisConfig{
+			Host:     getEnv("REDIS_HOST", "localhost"),
+			Port:     getEnv("REDIS_PORT", "6379"),
+			Password: getEnv("REDIS_PASSWORD", ""),
+			DB:       getIntEnv("REDIS_DB", 0),
+			PoolSize: getIntEnv("REDIS_POOL_SIZE", 10),
 		},
 	}
 

@@ -94,6 +94,7 @@ gin-boilerplate/
 - **Gin Framework** - HTTP web framework
 - **GORM** - PostgreSQL ORM with auto-migration
 - **AWS SDK v2** - S3-compatible storage integration
+- **Redis** - Caching and rate limiting
 - **JWT** - JSON Web Tokens for authentication
 - **Google OAuth 2.0** - Third-party authentication
 - **Swagger/OpenAPI** - API documentation generation
@@ -349,6 +350,7 @@ make fmt           # Format code
 make tidy          # Clean up dependencies
 make docs          # Generate Swagger docs
 make swagger       # Alias for docs command
+make redis-up      # Start Redis container (for development)
 make docker-build  # Build Docker image
 make docker-run    # Run Docker container
 make setup         # Quick setup for development
@@ -433,6 +435,8 @@ volumes:
 - **Role-Based Access Control**: Middleware for role verification
 - **File Security**: File type validation, size limits, and user isolation
 - **Storage Security**: Presigned URLs with expiration for secure file access
+- **Rate Limiting**: IP-based and user-based rate limiting with Redis
+- **Caching**: Redis integration for performance optimization
 - **SQL Injection Prevention**: GORM ORM provides protection
 - **HTTPS Ready**: Production deployment should use HTTPS
 

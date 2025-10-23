@@ -14,7 +14,9 @@ import (
 	"gin-boilerplate/internal/domain/service"
 	"gin-boilerplate/internal/infrastructure/config"
 	"gin-boilerplate/internal/infrastructure/persistence/postgres"
+	"gin-boilerplate/internal/infrastructure/redis"
 	"gin-boilerplate/internal/infrastructure/storage"
+	"gin-boilerplate/internal/infrastructure/redis"
 	"gin-boilerplate/internal/interfaces/http/handler"
 	httpmiddleware "gin-boilerplate/internal/interfaces/http/middleware"
 	"gin-boilerplate/internal/interfaces/http/router"
@@ -105,6 +107,19 @@ func main() {
 		logger.WithError(err).Fatal("Failed to initialize S3 client")
 	}
 
+	// Setup Redis client
+	redisClient, err := redis.NewRedisClient(redis.RedisConfig{
+		Host:     cfg.Redis.Host,
+		Port:     cfg.Redis.Port,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+		PoolSize: cfg.Redis.PoolSize,
+	})
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize Redis client")
+	}
+	defer redisClient.Close()
+
 	// Setup repositories
 	userRepo := postgres.NewUserRepository(db.GetDB())
 	tokenRepo := postgres.NewTokenRepository(db.GetDB())
@@ -154,7 +169,14 @@ func main() {
 	documentHandler := handler.NewDocumentHandler(documentUseCase)
 	avatarHandler := handler.NewAvatarHandler(avatarUseCase)
 
-	// Setup middleware
+	// Setup cache service and middleware
+	cacheService := service.NewCacheService(redisClient)
+	rateLimitMiddleware := httpmiddleware.NewRateLimitMiddleware(cacheService, httpmiddleware.RateLimitConfig{
+		RequestsPerWindow: 100,
+		WindowDuration:    time.Minute,
+	})
+
+	// Setup other middleware
 	authMiddleware := httpmiddleware.NewAuthMiddleware(tokenService)
 	roleMiddleware := httpmiddleware.NewRoleMiddleware()
 
@@ -171,6 +193,7 @@ func main() {
 		avatarHandler,
 		authMiddleware,
 		roleMiddleware,
+		rateLimitMiddleware,
 		loggerMiddleware,
 	)
 

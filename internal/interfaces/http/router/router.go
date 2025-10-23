@@ -22,6 +22,7 @@ func NewRouter(
 	avatarHandler *handler.AvatarHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	roleMiddleware *middleware.RoleMiddleware,
+	rateLimitMiddleware *middleware.RateLimitMiddleware,
 	loggerMiddleware func() gin.HandlerFunc,
 ) *Router {
 	gin.SetMode(gin.ReleaseMode)
@@ -29,6 +30,7 @@ func NewRouter(
 
 	// Add global middleware
 	engine.Use(gin.Recovery())
+	engine.Use(rateLimitMiddleware.RateLimitByIP())
 	engine.Use(loggerMiddleware())
 	engine.Use(middleware.CORSMiddleware())
 	engine.Use(middleware.RequestIDMiddleware())
@@ -37,7 +39,7 @@ func NewRouter(
 		engine: engine,
 	}
 
-	router.setupRoutes(authHandler, userHandler, documentHandler, avatarHandler, authMiddleware, roleMiddleware)
+	router.setupRoutes(authHandler, userHandler, documentHandler, avatarHandler, authMiddleware, roleMiddleware, rateLimitMiddleware)
 
 	return router
 }
@@ -50,6 +52,7 @@ func (r *Router) setupRoutes(
 	avatarHandler *handler.AvatarHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	roleMiddleware *middleware.RoleMiddleware,
+	rateLimitMiddleware *middleware.RateLimitMiddleware,
 ) {
 	// Swagger documentation
 	r.engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -87,7 +90,7 @@ func (r *Router) setupRoutes(
 }
 
 // setupPublicRoutes configures public routes
-func (r *Router) setupPublicRoutes(group *gin.RouterGroup, authHandler *handler.AuthHandler, avatarHandler *handler.AvatarHandler) {
+func (r *Router) setupPublicRoutes(group *gin.RouterGroup, authHandler *handler.AuthHandler, avatarHandler *handler.AvatarHandler, rateLimitMiddleware *middleware.RateLimitMiddleware) {
 	// Authentication routes
 	auth := group.Group("/auth")
 	{
@@ -107,12 +110,23 @@ func (r *Router) setupProtectedRoutes(
 	documentHandler *handler.DocumentHandler,
 	avatarHandler *handler.AvatarHandler,
 	roleMiddleware *middleware.RoleMiddleware,
+	rateLimitMiddleware *middleware.RateLimitMiddleware,
 ) {
 	// Authentication routes (require valid token)
 	auth := group.Group("/auth")
 	{
 		auth.POST("/logout", authHandler.Logout)
 		auth.POST("/logout-all", authHandler.LogoutAll)
+	}
+
+	// API endpoints with rate limiting
+	api := group.Group("/")
+	{
+		// Add rate limiting to specific sensitive endpoints
+		api.POST("/auth/login", rateLimitMiddleware.RateLimit("login"))
+		api.POST("/auth/register", rateLimitMiddleware.RateLimit("register"))
+		api.POST("/users/avatar", rateLimitMiddleware.RateLimit("avatar_upload"))
+		api.POST("/documents/upload", rateLimitMiddleware.RateLimit("document_upload"))
 	}
 
 	// User routes (authenticated users)
