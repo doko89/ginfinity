@@ -19,6 +19,7 @@ func NewRouter(
 	authHandler *handler.AuthHandler,
 	userHandler *handler.UserHandler,
 	documentHandler *handler.DocumentHandler,
+	avatarHandler *handler.AvatarHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	roleMiddleware *middleware.RoleMiddleware,
 	loggerMiddleware func() gin.HandlerFunc,
@@ -36,7 +37,7 @@ func NewRouter(
 		engine: engine,
 	}
 
-	router.setupRoutes(authHandler, userHandler, documentHandler, authMiddleware, roleMiddleware)
+	router.setupRoutes(authHandler, userHandler, documentHandler, avatarHandler, authMiddleware, roleMiddleware)
 
 	return router
 }
@@ -46,6 +47,7 @@ func (r *Router) setupRoutes(
 	authHandler *handler.AuthHandler,
 	userHandler *handler.UserHandler,
 	documentHandler *handler.DocumentHandler,
+	avatarHandler *handler.AvatarHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	roleMiddleware *middleware.RoleMiddleware,
 ) {
@@ -55,20 +57,23 @@ func (r *Router) setupRoutes(
 	// Health check endpoint
 	r.engine.GET("/health", r.healthCheck)
 
+	// Public avatar endpoint (no authentication required)
+	r.engine.GET("/api/v1/users/avatar/:id", avatarHandler.ServeAvatar)
+
 	// API v1 routes
 	v1 := r.engine.Group("/api/v1")
 	{
 		// Public routes (no authentication required)
 		public := v1.Group("/")
 		{
-			r.setupPublicRoutes(public, authHandler)
+			r.setupPublicRoutes(public, authHandler, avatarHandler)
 		}
 
 		// Protected routes (authentication required)
 		protected := v1.Group("/")
 		protected.Use(authMiddleware.RequireAuth())
 		{
-			r.setupProtectedRoutes(protected, authHandler, userHandler, documentHandler, roleMiddleware)
+			r.setupProtectedRoutes(protected, authHandler, userHandler, documentHandler, avatarHandler, roleMiddleware)
 		}
 
 		// Admin routes (admin role required)
@@ -82,7 +87,7 @@ func (r *Router) setupRoutes(
 }
 
 // setupPublicRoutes configures public routes
-func (r *Router) setupPublicRoutes(group *gin.RouterGroup, authHandler *handler.AuthHandler) {
+func (r *Router) setupPublicRoutes(group *gin.RouterGroup, authHandler *handler.AuthHandler, avatarHandler *handler.AvatarHandler) {
 	// Authentication routes
 	auth := group.Group("/auth")
 	{
@@ -100,6 +105,7 @@ func (r *Router) setupProtectedRoutes(
 	authHandler *handler.AuthHandler,
 	userHandler *handler.UserHandler,
 	documentHandler *handler.DocumentHandler,
+	avatarHandler *handler.AvatarHandler,
 	roleMiddleware *middleware.RoleMiddleware,
 ) {
 	// Authentication routes (require valid token)
@@ -115,6 +121,10 @@ func (r *Router) setupProtectedRoutes(
 		// Current user endpoints
 		users.GET("/me", userHandler.GetMe)
 		users.PUT("/me", userHandler.UpdateMe)
+
+		// Avatar endpoints
+		users.POST("/avatar", avatarHandler.UploadAvatar)
+		users.DELETE("/avatar", avatarHandler.RemoveAvatar)
 	}
 
 	// Document routes (authenticated users)

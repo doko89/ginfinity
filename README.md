@@ -170,6 +170,14 @@ The API will be available at `http://localhost:8080`
 | POST | `/api/v1/users/:id/promote` | Promote user to admin | Yes | Admin |
 | POST | `/api/v1/users/:id/demote` | Demote admin to user | Yes | Admin |
 
+### Avatar Endpoints
+
+| Method | Endpoint | Description | Auth Required | Role Required |
+|--------|----------|-------------|---------------|---------------|
+| POST | `/api/v1/users/avatar` | Upload avatar image | Yes | User/Admin |
+| DELETE | `/api/v1/users/avatar` | Remove current avatar | Yes | User/Admin |
+| GET | `/api/v1/users/avatar/:id` | Serve user avatar image | No | Public |
+
 ### Document Endpoints
 
 | Method | Endpoint | Description | Auth Required | Role Required |
@@ -223,6 +231,29 @@ curl -X POST http://localhost:8080/api/v1/documents/upload \
 ```bash
 curl -X GET http://localhost:8080/api/v1/documents/:id/download \
   -H "Authorization: Bearer <access-token>"
+```
+
+#### Upload Avatar
+```bash
+curl -X POST http://localhost:8080/api/v1/users/avatar \
+  -H "Authorization: Bearer <access-token>" \
+  -F "avatar=@/path/to/avatar.jpg"
+```
+
+#### Remove Avatar
+```bash
+curl -X DELETE http://localhost:8080/api/v1/users/avatar \
+  -H "Authorization: Bearer <access-token>"
+```
+
+#### Access User Avatar
+```bash
+# For any user avatar
+curl -X GET http://localhost:8080/api/v1/users/avatar/:user_id
+
+# This will redirect to:
+# - Google avatar URL (if from OAuth)
+# - S3 presigned URL (if uploaded)
 ```
 
 #### Access API Documentation
@@ -294,10 +325,12 @@ SERVER_ENV=development
 3. Configure with your Space endpoint and credentials
 
 #### File Upload Restrictions
-- **Maximum file size**: 10MB
-- **Allowed file types**: Images (JPEG, PNG, GIF), PDF, Text, Word documents
-- **User isolation**: Users can only access their own documents
-- **Automatic cleanup**: Files are deleted from storage when documents are deleted
+- **Maximum file size**: 10MB (documents), 2MB (avatars)
+- **Allowed file types**:
+  - Documents: Images (JPEG, PNG, GIF), PDF, Text, Word documents
+  - Avatars: Images only (JPEG, PNG, GIF, WebP)
+- **User isolation**: Users can only access their own files
+- **Automatic cleanup**: Files are deleted from storage when documents/avatars are deleted
 
 ## 🧪 Development
 

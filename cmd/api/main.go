@@ -128,6 +128,10 @@ func main() {
 	// Document management use cases
 	documentUseCase := usecase.NewDocumentUseCase(documentRepo, s3Client)
 
+	// Avatar management use cases
+	avatarService := service.NewAvatarService(s3Client)
+	avatarUseCase := usecase.NewAvatarUseCase(userRepo, avatarService, s3Client)
+
 	// Setup handlers
 	authHandler := handler.NewAuthHandler(
 		registerUseCase,
@@ -148,6 +152,7 @@ func main() {
 	)
 
 	documentHandler := handler.NewDocumentHandler(documentUseCase)
+	avatarHandler := handler.NewAvatarHandler(avatarUseCase)
 
 	// Setup middleware
 	authMiddleware := httpmiddleware.NewAuthMiddleware(tokenService)
@@ -163,6 +168,7 @@ func main() {
 		authHandler,
 		userHandler,
 		documentHandler,
+		avatarHandler,
 		authMiddleware,
 		roleMiddleware,
 		loggerMiddleware,

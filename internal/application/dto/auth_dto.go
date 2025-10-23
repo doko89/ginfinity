@@ -1,6 +1,8 @@
 package dto
 
 import (
+	"fmt"
+	"strings"
 	"gin-boilerplate/internal/domain/entity"
 )
 
@@ -89,17 +91,35 @@ type PaginationRequest struct {
 
 // ToUserResponse converts entity.User to UserResponse
 func ToUserResponse(user *entity.User) UserResponse {
+	var avatarURL *string
+	if user.Avatar != nil {
+		// If it's a Google avatar, return as-is
+		if isGoogleAvatar(*user.Avatar) {
+			avatarURL = user.Avatar
+		} else {
+			// For S3 avatars, return API endpoint URL
+			apiURL := fmt.Sprintf("/api/v1/users/avatar/%s", user.ID)
+			avatarURL = &apiURL
+		}
+	}
+
 	return UserResponse{
 		ID:            user.ID,
 		Email:         user.Email,
 		Name:          user.Name,
 		Role:          string(user.Role),
 		Provider:      string(user.Provider),
-		Avatar:        user.Avatar,
+		Avatar:        avatarURL,
 		EmailVerified: user.EmailVerified,
 		CreatedAt:     user.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:     user.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
+}
+
+// isGoogleAvatar checks if avatar URL is from Google
+func isGoogleAvatar(avatarURL string) bool {
+	return strings.Contains(avatarURL, "googleusercontent.com") ||
+		strings.Contains(avatarURL, "lh3.googleusercontent.com")
 }
 
 // ToUsersListResponse converts users slice to UsersListResponse
